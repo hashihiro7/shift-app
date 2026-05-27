@@ -143,11 +143,11 @@
     .time-btn:active{background:#dce0e5}
 
     /* Numeric keypad */
-    .tpad-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:500;display:flex;align-items:flex-end}
-    .tpad-sheet{background:#e8ecf0;width:100%;border-radius:20px 20px 0 0;padding:14px 12px 36px;user-select:none;-webkit-user-select:none}
-    .tpad-display{background:#fff;border-radius:14px;padding:16px 12px 10px;text-align:center;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
-    .tpad-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
-    .tpad-key{background:#fff;border:none;border-radius:12px;height:56px;font-size:22px;font-weight:600;cursor:pointer;box-shadow:0 1px 2px rgba(0,0,0,.12);-webkit-tap-highlight-color:transparent}
+    .tpad-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.45);z-index:500;display:flex;align-items:flex-end}
+    .tpad-sheet{background:#e8ecf0;width:100%;max-width:100%;box-sizing:border-box;border-radius:20px 20px 0 0;padding:14px 10px calc(env(safe-area-inset-bottom,0px) + 24px);user-select:none;-webkit-user-select:none;flex-shrink:0;overflow:hidden}
+    .tpad-display{background:#fff;border-radius:14px;padding:10px;text-align:center;margin-bottom:10px;box-shadow:0 1px 3px rgba(0,0,0,.08);height:80px;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden}
+    .tpad-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;width:100%;box-sizing:border-box}
+    .tpad-key{background:#fff;border:none;border-radius:12px;height:54px;font-size:22px;font-weight:600;cursor:pointer;box-shadow:0 1px 2px rgba(0,0,0,.12);-webkit-tap-highlight-color:transparent;touch-action:manipulation;width:100%;box-sizing:border-box}
     .tpad-key:active{background:#d1d5db}
     .tpad-back{background:#adb5bd;color:#fff}
     .tpad-back:active{background:#909ba3}
@@ -956,48 +956,59 @@ function showToast(msg){
 let tpad={entered:[],targetId:'',isEnd:false,label:''};
 
 function showTimePad(targetId,currentVal,isEnd,label){
-  const parts=String(currentVal).split(':');
-  const h=(parts[0]||'00').padStart(2,'0');
-  const m=(parts[1]||'00').padStart(2,'0');
-  tpad={entered:[h[0],h[1],m[0],m[1]],targetId,isEnd,label:label||''};
+  tpad={entered:[],targetId,isEnd,label:label||''};
   renderTPad();
 }
 
 function renderTPad(){
-  const e=tpad.entered;
-  const d=i=>e[i]||'_';
-  const dispStr=`${d(0)}${d(1)}:${d(2)}${d(3)}`;
-  let preview='';
-  if(e.length===4){
-    const h=parseInt(e[0]+e[1]),m=parseInt(e[2]+e[3]);
-    if(h<=(tpad.isEnd?32:23)&&m<=59&&!(h===32&&m>0)){
-      const t=`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
-      preview=tpad.isEnd?dispTime(t):t;
-    } else { preview='⚠ 無効な時刻'; }
-  }
-  const keys=[1,2,3,4,5,6,7,8,9,'back',0,'ok'];
-  const kbtns=keys.map(k=>{
-    if(k==='back') return `<button class="tpad-key tpad-back" onclick="tpadKey('back')">⌫</button>`;
-    if(k==='ok')   return `<button class="tpad-key tpad-ok"  onclick="tpadConfirm()">✓</button>`;
-    return `<button class="tpad-key" onclick="tpadKey(${k})">${k}</button>`;
-  }).join('');
+  document.body.style.overflow='hidden';
   document.getElementById('tpadRoot').innerHTML=`
     <div class="tpad-overlay" onclick="clearTPad()">
       <div class="tpad-sheet" onclick="event.stopPropagation()">
         ${tpad.label?`<div style="text-align:center;font-size:12px;color:#888;margin-bottom:8px">${tpad.label}</div>`:''}
         <div class="tpad-display">
-          <div style="font-size:34px;letter-spacing:8px;font-family:monospace;color:#1e2a3a">${dispStr}</div>
-          <div style="font-size:13px;color:#888;min-height:18px;margin-top:4px">${preview}</div>
+          <div id="tpadDigits" style="font-size:34px;letter-spacing:8px;font-family:monospace;color:#1e2a3a">_ _:_ _</div>
+          <div id="tpadPreview" style="font-size:13px;color:#888;height:18px;margin-top:4px"></div>
         </div>
-        <div class="tpad-grid">${kbtns}</div>
+        <div class="tpad-grid">
+          <button class="tpad-key" onclick="tpadKey(1)">1</button>
+          <button class="tpad-key" onclick="tpadKey(2)">2</button>
+          <button class="tpad-key" onclick="tpadKey(3)">3</button>
+          <button class="tpad-key" onclick="tpadKey(4)">4</button>
+          <button class="tpad-key" onclick="tpadKey(5)">5</button>
+          <button class="tpad-key" onclick="tpadKey(6)">6</button>
+          <button class="tpad-key" onclick="tpadKey(7)">7</button>
+          <button class="tpad-key" onclick="tpadKey(8)">8</button>
+          <button class="tpad-key" onclick="tpadKey(9)">9</button>
+          <button class="tpad-key tpad-back" onclick="tpadKey('back')">⌫</button>
+          <button class="tpad-key" onclick="tpadKey(0)">0</button>
+          <button class="tpad-key tpad-ok" onclick="tpadConfirm()">✓</button>
+        </div>
       </div>
     </div>`;
+  updateTPadDisplay();
+}
+
+function updateTPadDisplay(){
+  const e=tpad.entered;
+  const d=i=>e[i]!==undefined?e[i]:'_';
+  const el=document.getElementById('tpadDigits');
+  const pr=document.getElementById('tpadPreview');
+  if(!el) return;
+  el.textContent=`${d(0)}${d(1)}:${d(2)}${d(3)}`;
+  if(e.length===4){
+    const h=parseInt(e[0]+e[1]),m=parseInt(e[2]+e[3]);
+    if(h<=(tpad.isEnd?32:23)&&m<=59&&!(h===32&&m>0)){
+      const t=`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+      pr.textContent=tpad.isEnd?dispTime(t):t;
+    } else { pr.textContent='⚠ 無効な時刻'; }
+  } else { pr.textContent=''; }
 }
 
 function tpadKey(k){
   if(k==='back'){ tpad.entered.pop(); }
   else if(tpad.entered.length<4){ tpad.entered.push(String(k)); }
-  renderTPad();
+  updateTPadDisplay();
 }
 
 function tpadConfirm(){
@@ -1016,6 +1027,7 @@ function tpadConfirm(){
 }
 
 function clearTPad(){
+  document.body.style.overflow='';
   document.getElementById('tpadRoot').innerHTML='';
 }
 
