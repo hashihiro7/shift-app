@@ -471,7 +471,7 @@ function showQRModal(type='admin'){
   const staffUrl=APP_URL+'/?staff';
   const isAdmin=type==='admin';
   const url=isAdmin?adminUrl:staffUrl;
-  const qrImg=`https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=8&data=${encodeURIComponent(url)}`;
+  const qrImg=`https://quickchart.io/qr?size=220&margin=2&text=${encodeURIComponent(url)}`;
   showModal(`
     <div class="sheet-handle"></div>
     <div class="sheet-body">
