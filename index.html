@@ -441,28 +441,26 @@ function showChangePINModal(){
   render();
 }
 
-function showQRModal(){
-  const base=location.origin+location.pathname.replace(/\/$/,'');
-  const adminUrl=base+'/';
-  const staffUrl=base+'/?staff';
-  const qrImg=(url)=>`https://api.qrserver.com/v1/create-qr-code/?size=160x160&margin=6&data=${encodeURIComponent(url)}`;
+const APP_URL='https://lh-shift-app.netlify.app';
+
+function showQRModal(type='admin'){
+  const adminUrl=APP_URL+'/';
+  const staffUrl=APP_URL+'/?staff';
+  const isAdmin=type==='admin';
+  const url=isAdmin?adminUrl:staffUrl;
+  const qrImg=`https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=8&data=${encodeURIComponent(url)}`;
   showModal(`
     <div class="sheet-handle"></div>
     <div class="sheet-body">
-      <div class="sheet-title">QRコード</div>
-      <div style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap">
-        <div style="text-align:center">
-          <div style="font-size:13px;font-weight:700;margin-bottom:8px;color:#1e2a3a">🔐 管理者用</div>
-          <img src="${qrImg(adminUrl)}" width="160" height="160" style="border-radius:8px;border:1px solid #eee">
-          <div style="font-size:9px;color:#aaa;margin-top:6px;word-break:break-all;max-width:160px">${adminUrl}</div>
-        </div>
-        <div style="text-align:center">
-          <div style="font-size:13px;font-weight:700;margin-bottom:8px;color:#27ae60">👀 スタッフ用</div>
-          <img src="${qrImg(staffUrl)}" width="160" height="160" style="border-radius:8px;border:1px solid #eee">
-          <div style="font-size:9px;color:#aaa;margin-top:6px;word-break:break-all;max-width:160px">${staffUrl}</div>
-        </div>
+      <div style="display:flex;gap:0;margin-bottom:20px;border-radius:10px;overflow:hidden;border:1.5px solid #e0e0e0">
+        <button onclick="showQRModal('admin')" style="flex:1;padding:10px;border:none;font-size:13px;font-weight:700;cursor:pointer;background:${isAdmin?'#1e2a3a':'#f5f5f5'};color:${isAdmin?'#fff':'#999'}">🔐 管理者用</button>
+        <button onclick="showQRModal('staff')" style="flex:1;padding:10px;border:none;font-size:13px;font-weight:700;cursor:pointer;background:${!isAdmin?'#27ae60':'#f5f5f5'};color:${!isAdmin?'#fff':'#999'}">👀 スタッフ用</button>
       </div>
-      <div style="height:12px"></div>
+      <div style="text-align:center">
+        <img src="${qrImg}" width="220" height="220" style="border-radius:12px;border:1px solid #eee">
+        <div style="font-size:11px;color:#aaa;margin-top:10px;word-break:break-all">${url}</div>
+      </div>
+      <div style="height:16px"></div>
       <button class="btn btn-ghost btn-full btn-sm" onclick="clearModal()">閉じる</button>
     </div>`);
 }
