@@ -1,5 +1,5 @@
 const CACHE = 'shift-app-v3';
-const ASSETS = ['/', '/index.html', '/manifest.json', '/icon.svg'];
+const ASSETS = ['/manifest.json', '/icon.svg'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
@@ -14,6 +14,11 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('fetch', e => {
+  // HTMLは常にネットワークから取得（キャッシュを使わない）
+  if(e.request.destination === 'document'){
+    e.respondWith(fetch(e.request).catch(() => caches.match(e.request)));
+    return;
+  }
   e.respondWith(
     caches.match(e.request).then(cached => cached || fetch(e.request))
   );
