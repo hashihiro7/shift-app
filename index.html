@@ -11,6 +11,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="シフト管理">
   <link rel="apple-touch-icon" href="icon.svg">
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
   <style>
     *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
     body{font-family:-apple-system,BlinkMacSystemFont,'Hiragino Sans',sans-serif;background:#f0f2f5;color:#1a1a1a;height:100dvh;display:flex;flex-direction:column;overflow:hidden}
@@ -326,6 +327,94 @@ let selectedColor=STAFF_COLORS[0];
 let wcondDraft={};
 
 // ════════════════════════════════════════════════════════
+//  AUTH / MODE
+// ════════════════════════════════════════════════════════
+const IS_STAFF = new URLSearchParams(location.search).has('staff');
+let isAdminAuth = false;
+let pinEntry = [];
+
+async function hashPIN(pin){
+  const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode('shiftpin:'+pin));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+
+function renderPINScreen(){
+  const noPin=!localStorage.getItem('adminPINHash');
+  setHeader('シフト管理',false,'');
+  document.getElementById('bottomNav').style.display='none';
+  document.getElementById('modalRoot').innerHTML='';
+  const dots=Array.from({length:4},(_,i)=>
+    `<div style="width:18px;height:18px;border-radius:50%;border:2.5px solid #1e2a3a;background:${pinEntry[i]!==undefined?'#1e2a3a':'transparent'};transition:.15s"></div>`
+  ).join('');
+  const mk=(n,cls,fn)=>`<button class="tpad-key ${cls}" ontouchstart="event.preventDefault();${fn}" onclick="${fn}">${n}</button>`;
+  document.getElementById('appContent').innerHTML=`
+    <div style="display:flex;flex-direction:column;align-items:center;padding:48px 20px 20px">
+      <div style="font-size:44px;margin-bottom:14px">🔐</div>
+      <div style="font-size:18px;font-weight:800;color:#1e2a3a;margin-bottom:6px">${noPin?'管理者PINを設定':'管理者PIN入力'}</div>
+      <div style="font-size:13px;color:#aaa;margin-bottom:28px">${noPin?'4桁のPINを決めてください':'4桁のPINを入力してください'}</div>
+      <div style="display:flex;gap:20px;margin-bottom:36px">${dots}</div>
+      <div style="width:100%;max-width:300px">
+        <div class="tpad-row">${[1,2,3].map(n=>mk(n,'',`pinKey(${n})`)).join('')}</div>
+        <div class="tpad-row">${[4,5,6].map(n=>mk(n,'',`pinKey(${n})`)).join('')}</div>
+        <div class="tpad-row">${[7,8,9].map(n=>mk(n,'',`pinKey(${n})`)).join('')}</div>
+        <div class="tpad-row">
+          <div class="tpad-key" style="background:transparent;box-shadow:none;pointer-events:none"></div>
+          ${mk(0,'',`pinKey(0)`)}
+          ${mk('⌫','tpad-key-back',`pinKey('back')`)}
+        </div>
+      </div>
+    </div>`;
+}
+
+async function pinKey(k){
+  if(k==='back'){pinEntry.pop();renderPINScreen();return;}
+  if(pinEntry.length>=4) return;
+  pinEntry.push(k);
+  renderPINScreen();
+  if(pinEntry.length<4) return;
+  const pin=pinEntry.join(''); pinEntry=[];
+  const hash=await hashPIN(pin);
+  const stored=localStorage.getItem('adminPINHash');
+  if(!stored){
+    localStorage.setItem('adminPINHash',hash);
+    isAdminAuth=true; showToast('PINを設定しました'); render();
+  } else if(hash===stored){
+    isAdminAuth=true; render();
+  } else {
+    showToast('PINが違います'); renderPINScreen();
+  }
+}
+
+function showQRModal(){
+  const base=location.origin+location.pathname;
+  const adminUrl=base;
+  const staffUrl=base+'?staff';
+  showModal(`
+    <div class="sheet-handle"></div>
+    <div class="sheet-body">
+      <div class="sheet-title">QRコード</div>
+      <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
+        <div style="text-align:center">
+          <div style="font-size:13px;font-weight:700;margin-bottom:8px;color:#1e2a3a">管理者用</div>
+          <canvas id="qrAdmin"></canvas>
+          <div style="font-size:9px;color:#aaa;margin-top:4px;word-break:break-all;max-width:150px">${adminUrl}</div>
+        </div>
+        <div style="text-align:center">
+          <div style="font-size:13px;font-weight:700;margin-bottom:8px;color:#27ae60">スタッフ用</div>
+          <canvas id="qrStaff"></canvas>
+          <div style="font-size:9px;color:#aaa;margin-top:4px;word-break:break-all;max-width:150px">${staffUrl}</div>
+        </div>
+      </div>
+      <div style="height:12px"></div>
+      <button class="btn btn-ghost btn-full btn-sm" onclick="clearModal()">閉じる</button>
+    </div>`);
+  setTimeout(()=>{
+    QRCode.toCanvas(document.getElementById('qrAdmin'),adminUrl,{width:150,margin:1});
+    QRCode.toCanvas(document.getElementById('qrStaff'),staffUrl,{width:150,margin:1});
+  },100);
+}
+
+// ════════════════════════════════════════════════════════
 //  NAV
 // ════════════════════════════════════════════════════════
 function switchTab(tab){
@@ -342,6 +431,11 @@ function setHeader(title,back,actions=''){
 function handleBack(){ editingId=null; render(); }
 function render(){
   clearModal();
+  if(IS_STAFF){
+    document.getElementById('bottomNav').style.display='none';
+    renderWeekly(); return;
+  }
+  if(!isAdminAuth){renderPINScreen();return;}
   if(editingId!==null){renderStaffEdit();return;}
   switch(currentTab){
     case 'staff': renderStaffList(); break;
@@ -354,7 +448,7 @@ function render(){
 //  STAFF LIST
 // ════════════════════════════════════════════════════════
 function renderStaffList(){
-  setHeader('スタッフ一覧',false);
+  setHeader('スタッフ一覧',false,`<button class="btn btn-sm" style="background:#2980b9;color:#fff;font-size:11px" onclick="showQRModal()">QR</button>`);
   const el=document.getElementById('appContent');
   if(!db.staff.length){
     el.innerHTML=`<div class="empty-state"><div style="font-size:48px;margin-bottom:12px">👥</div><div>スタッフを追加してください</div></div>`;
@@ -479,11 +573,13 @@ function renderWeekly(){
 
   // Header actions
   let actions='';
-  if(!confirmed){
-    actions=`<button class="btn btn-sm" style="background:#7f8c8d;color:#fff;font-size:11px" onclick="showWeekCondModal()">今週条件</button>`;
-  } else {
-    actions=`<button class="btn btn-sm btn-ghost" style="font-size:11px;border-color:#aaa;color:#aaa" onclick="doUnconfirm()">解除</button>
-             <button class="btn btn-sm btn-accent" style="font-size:11px" onclick="showSpotModal()">急遽出勤</button>`;
+  if(!IS_STAFF){
+    if(!confirmed){
+      actions=`<button class="btn btn-sm" style="background:#7f8c8d;color:#fff;font-size:11px" onclick="showWeekCondModal()">今週条件</button>`;
+    } else {
+      actions=`<button class="btn btn-sm btn-ghost" style="font-size:11px;border-color:#aaa;color:#aaa" onclick="doUnconfirm()">解除</button>
+               <button class="btn btn-sm btn-accent" style="font-size:11px" onclick="showSpotModal()">急遽出勤</button>`;
+    }
   }
   setHeader('週間シフト',false,actions);
 
@@ -528,7 +624,7 @@ function renderWeekly(){
       else if(ctype==='earlyLeave') emClass='em-early';
       else if(ctype==='spot') emClass='em-spot';
 
-      const clickFn=confirmed
+      const clickFn=IS_STAFF?'':confirmed
         ?`openEmergencyModal('${s.id}','${dateStr}')`
         :`openShiftEdit('${s.id}','${dateStr}')`;
 
@@ -552,7 +648,7 @@ function renderWeekly(){
     </div>`;
   }).join('');
 
-  const confirmBtn=!confirmed
+  const confirmBtn=(!confirmed&&!IS_STAFF)
     ?`<div class="confirm-bar"><button class="btn btn-success btn-full" style="font-size:15px" onclick="doConfirm()">✓ このシフトを確定する</button></div>`
     :'';
 
@@ -892,8 +988,9 @@ function renderMonthly(){
       <div><div style="font-size:22px;font-weight:800;color:#1e2a3a">${totH.toFixed(1)}</div>
         <div style="font-size:10px;color:#999;margin-top:2px">合計時間（h）</div></div>
       <div style="width:1px;background:#eee"></div>
-      <div><div style="font-size:22px;font-weight:800;color:#e94560">¥${totW.toLocaleString()}</div>
+      ${IS_STAFF?'':`<div><div style="font-size:22px;font-weight:800;color:#e94560">¥${totW.toLocaleString()}</div>
         <div style="font-size:10px;color:#999;margin-top:2px">合計人件費</div></div>
+      <div style="width:1px;background:#eee"></div>`}
       <div style="width:1px;background:#eee"></div>
       <div><div style="font-size:22px;font-weight:800;color:#27ae60">${active}</div>
         <div style="font-size:10px;color:#999;margin-top:2px">出勤スタッフ</div></div>
@@ -906,11 +1003,11 @@ function renderMonthly(){
             <div style="display:flex;align-items:center;gap:10px">
               <div class="staff-avatar" style="background:${x.staff.color};width:36px;height:36px;font-size:14px">${x.staff.name[0]}</div>
               <div><div style="font-weight:600;font-size:14px">${x.staff.name}</div>
-                <div style="font-size:11px;color:#aaa">${x.days}日 / ¥${x.staff.hourlyWage.toLocaleString()}/h</div></div>
+                <div style="font-size:11px;color:#aaa">${x.days}日${IS_STAFF?'':` / ¥${x.staff.hourlyWage.toLocaleString()}/h`}</div></div>
             </div>
             <div style="text-align:right">
               <div style="font-weight:800;font-size:16px">${x.hours.toFixed(1)}h</div>
-              <div style="font-size:12px;color:#e94560;font-weight:600">¥${x.wage.toLocaleString()}</div>
+              ${IS_STAFF?'':`<div style="font-size:12px;color:#e94560;font-weight:600">¥${x.wage.toLocaleString()}</div>`}
             </div>
           </div>
           <div class="hours-bar"><div class="hours-fill" style="width:${(x.hours/maxH*100).toFixed(1)}%;background:${x.staff.color}"></div></div>
