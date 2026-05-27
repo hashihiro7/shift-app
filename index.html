@@ -385,6 +385,63 @@ async function pinKey(k){
   }
 }
 
+function showChangePINModal(){
+  let step='current'; // 'current' → 'new' → 'confirm'
+  let newPinHash='';
+  let entry=[];
+
+  const render=()=>{
+    const dots=Array.from({length:4},(_,i)=>
+      `<div style="width:16px;height:16px;border-radius:50%;border:2px solid #1e2a3a;background:${entry[i]!==undefined?'#1e2a3a':'transparent'}"></div>`
+    ).join('');
+    const titles={current:'現在のPINを入力',new:'新しいPINを入力',confirm:'新しいPINをもう一度'};
+    const mk=(n,cls,fn)=>`<button class="tpad-key ${cls}" ontouchstart="event.preventDefault();${fn}" onclick="${fn}">${n}</button>`;
+    document.getElementById('modalRoot').innerHTML=`
+      <div class="overlay" onclick="">
+        <div class="sheet" onclick="event.stopPropagation()">
+          <div class="sheet-handle"></div>
+          <div class="sheet-body">
+            <div class="sheet-title">PIN変更</div>
+            <div style="text-align:center;font-size:14px;font-weight:600;margin-bottom:16px">${titles[step]}</div>
+            <div style="display:flex;gap:16px;justify-content:center;margin-bottom:24px">${dots}</div>
+            <div style="max-width:280px;margin:0 auto">
+              <div class="tpad-row">${[1,2,3].map(n=>mk(n,'',`cpKey(${n})`)).join('')}</div>
+              <div class="tpad-row">${[4,5,6].map(n=>mk(n,'',`cpKey(${n})`)).join('')}</div>
+              <div class="tpad-row">${[7,8,9].map(n=>mk(n,'',`cpKey(${n})`)).join('')}</div>
+              <div class="tpad-row">
+                <div class="tpad-key" style="background:transparent;box-shadow:none;pointer-events:none"></div>
+                ${mk(0,'',`cpKey(0)`)}
+                ${mk('⌫','tpad-key-back',`cpKey('back')`)}
+              </div>
+            </div>
+            <div style="height:12px"></div>
+            <button class="btn btn-ghost btn-full btn-sm" onclick="clearModal()">キャンセル</button>
+          </div>
+        </div>
+      </div>`;
+  };
+
+  window.cpKey=async(k)=>{
+    if(k==='back'){entry.pop();render();return;}
+    if(entry.length>=4) return;
+    entry.push(k); render();
+    if(entry.length<4) return;
+    const pin=entry.join(''); entry=[];
+    const hash=await hashPIN(pin);
+    if(step==='current'){
+      if(hash!==localStorage.getItem('adminPINHash')){showToast('PINが違います');render();return;}
+      step='new'; render();
+    } else if(step==='new'){
+      newPinHash=hash; step='confirm'; render();
+    } else {
+      if(hash!==newPinHash){showToast('PINが一致しません');step='new';newPinHash='';render();return;}
+      localStorage.setItem('adminPINHash',newPinHash);
+      clearModal(); showToast('PINを変更しました');
+    }
+  };
+  render();
+}
+
 function showQRModal(){
   const base=location.origin+location.pathname;
   const adminUrl=base;
@@ -448,7 +505,9 @@ function render(){
 //  STAFF LIST
 // ════════════════════════════════════════════════════════
 function renderStaffList(){
-  setHeader('スタッフ一覧',false,`<button class="btn btn-sm" style="background:#2980b9;color:#fff;font-size:11px" onclick="showQRModal()">QR</button>`);
+  setHeader('スタッフ一覧',false,`
+    <button class="btn btn-sm" style="background:#7f8c8d;color:#fff;font-size:11px" onclick="showChangePINModal()">PIN変更</button>
+    <button class="btn btn-sm" style="background:#2980b9;color:#fff;font-size:11px" onclick="showQRModal()">QR</button>`);
   const el=document.getElementById('appContent');
   if(!db.staff.length){
     el.innerHTML=`<div class="empty-state"><div style="font-size:48px;margin-bottom:12px">👥</div><div>スタッフを追加してください</div></div>`;
