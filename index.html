@@ -11,6 +11,9 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="シフト管理">
   <link rel="apple-touch-icon" href="icon.svg">
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
   <style>
     *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
     body{font-family:-apple-system,BlinkMacSystemFont,'Hiragino Sans',sans-serif;background:#f0f2f5;color:#1a1a1a;height:100dvh;display:flex;flex-direction:column;overflow:hidden}
@@ -196,14 +199,69 @@ const TL_START = 8*60, TL_END = 32*60, TL_DUR = 24*60;
 const BAR_H = 12, BAR_SLOT = 18, DAY_PAD = 5;
 
 // ════════════════════════════════════════════════════════
+//  FIREBASE
+// ════════════════════════════════════════════════════════
+const firebaseConfig = {
+  apiKey: "AIzaSyBijLaaDV0kjREy3wGmpRT3Eul9fzdp8GI",
+  authDomain: "shift-app-9fba8.firebaseapp.com",
+  projectId: "shift-app-9fba8",
+  storageBucket: "shift-app-9fba8.firebasestorage.app",
+  messagingSenderId: "308717527690",
+  appId: "1:308717527690:web:fa1e9a701f9b6e15b98373"
+};
+firebase.initializeApp(firebaseConfig);
+const fsdb = firebase.firestore();
+const SHIFT_DOC = fsdb.collection('shift').doc('main');
+
+// ════════════════════════════════════════════════════════
 //  DB
 // ════════════════════════════════════════════════════════
 let db = { staff: [], weeks: {} };
-function saveDB(){ localStorage.setItem('shiftv5', JSON.stringify(db)); }
-function loadDB(){
-  try{ const d=localStorage.getItem('shiftv5'); if(d) db=JSON.parse(d); } catch(e){}
-}
+let dbLoaded = false;
+
 function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2); }
+
+async function saveDB(){
+  try {
+    await SHIFT_DOC.set(JSON.parse(JSON.stringify(db)));
+  } catch(e){
+    showToast('保存に失敗しました');
+    console.error('saveDB error:', e);
+  }
+}
+
+function initDB(){
+  document.getElementById('appContent').innerHTML=`
+    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:80dvh">
+      <div style="font-size:36px;margin-bottom:16px">⏳</div>
+      <div style="font-size:15px;color:#888">データを読み込んでいます...</div>
+    </div>`;
+
+  fsdb.enablePersistence({synchronizeTabs:true}).catch(()=>{});
+
+  SHIFT_DOC.onSnapshot(snap => {
+    if(snap.exists){
+      const data = snap.data();
+      db.staff = data.staff || [];
+      db.weeks  = data.weeks  || {};
+    } else {
+      db = { staff: [], weeks: {} };
+    }
+    if(!dbLoaded){
+      dbLoaded = true;
+      render();
+    } else if(editingId === null){
+      render();
+    }
+  }, err => {
+    console.error('Firestore error:', err);
+    if(!dbLoaded){
+      dbLoaded = true;
+      db = { staff: [], weeks: {} };
+      render();
+    }
+  });
+}
 
 // ════════════════════════════════════════════════════════
 //  DATE (timezone-safe)
@@ -1205,8 +1263,7 @@ function clearTPad(){
 // ════════════════════════════════════════════════════════
 //  INIT
 // ════════════════════════════════════════════════════════
-loadDB();
-render();
+initDB();
 
 if('serviceWorker' in navigator){
   navigator.serviceWorker.register('/sw.js').catch(()=>{});
