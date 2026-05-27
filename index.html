@@ -330,6 +330,7 @@ let wcondDraft={};
 // ════════════════════════════════════════════════════════
 const IS_STAFF = new URLSearchParams(location.search).has('staff');
 let isAdminAuth = false;
+let isStaffAuth = false;
 let pinEntry = [];
 
 async function hashPIN(pin){
@@ -337,8 +338,10 @@ async function hashPIN(pin){
   return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
 }
 
-function renderPINScreen(){
-  const noPin=!localStorage.getItem('adminPINHash');
+function renderPINScreen(mode='admin'){
+  const isStaffMode = mode==='staff';
+  const pinKey_name = isStaffMode ? 'staffPINHash' : 'adminPINHash';
+  const noPin=!localStorage.getItem(pinKey_name);
   setHeader('シフト管理',false,'');
   document.getElementById('bottomNav').style.display='none';
   document.getElementById('modalRoot').innerHTML='';
@@ -353,39 +356,58 @@ function renderPINScreen(){
       <div style="font-size:13px;color:#aaa;margin-bottom:28px">${noPin?'4桁のPINを決めてください':'4桁のPINを入力してください'}</div>
       <div style="display:flex;gap:20px;margin-bottom:36px">${dots}</div>
       <div style="width:100%;max-width:300px">
-        <div class="tpad-row">${[1,2,3].map(n=>mk(n,'',`pinKey(${n})`)).join('')}</div>
-        <div class="tpad-row">${[4,5,6].map(n=>mk(n,'',`pinKey(${n})`)).join('')}</div>
-        <div class="tpad-row">${[7,8,9].map(n=>mk(n,'',`pinKey(${n})`)).join('')}</div>
+        <div class="tpad-row">${[1,2,3].map(n=>mk(n,'',`pinKey(${n},'${mode}')`)).join('')}</div>
+        <div class="tpad-row">${[4,5,6].map(n=>mk(n,'',`pinKey(${n},'${mode}')`)).join('')}</div>
+        <div class="tpad-row">${[7,8,9].map(n=>mk(n,'',`pinKey(${n},'${mode}')`)).join('')}</div>
         <div class="tpad-row">
           <div class="tpad-key" style="background:transparent;box-shadow:none;pointer-events:none"></div>
-          ${mk(0,'',`pinKey(0)`)}
-          ${mk('⌫','tpad-key-back',`pinKey('back')`)}
+          ${mk(0,'',`pinKey(0,'${mode}')`)}
+          ${mk('⌫','tpad-key-back',`pinKey('back','${mode}')`)}
         </div>
       </div>
     </div>`;
 }
 
-async function pinKey(k){
-  if(k==='back'){pinEntry.pop();renderPINScreen();return;}
+async function pinKey(k, mode='admin'){
+  if(k==='back'){pinEntry.pop();renderPINScreen(mode);return;}
   if(pinEntry.length>=4) return;
   pinEntry.push(k);
-  renderPINScreen();
+  renderPINScreen(mode);
   if(pinEntry.length<4) return;
   const pin=pinEntry.join(''); pinEntry=[];
   const hash=await hashPIN(pin);
-  const stored=localStorage.getItem('adminPINHash');
+  const pinKey_name = mode==='staff' ? 'staffPINHash' : 'adminPINHash';
+  const stored=localStorage.getItem(pinKey_name);
   if(!stored){
-    localStorage.setItem('adminPINHash',hash);
-    isAdminAuth=true; showToast('PINを設定しました'); render();
+    localStorage.setItem(pinKey_name,hash);
+    if(mode==='staff'){ isStaffAuth=true; showToast('スタッフPINを設定しました'); render(); }
+    else { isAdminAuth=true; showToast('PINを設定しました'); render(); }
   } else if(hash===stored){
-    isAdminAuth=true; render();
+    if(mode==='staff'){ isStaffAuth=true; render(); }
+    else { isAdminAuth=true; render(); }
   } else {
-    showToast('PINが違います'); renderPINScreen();
+    showToast('PINが違います'); renderPINScreen(mode);
   }
 }
 
-function showChangePINModal(){
-  let step='current'; // 'current' → 'new' → 'confirm'
+function showPINSettingsModal(){
+  showModal(`
+    <div class="sheet-handle"></div>
+    <div class="sheet-body">
+      <div class="sheet-title">PIN設定</div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <button class="btn btn-primary btn-full" onclick="clearModal();showChangePINModal('admin')">🔐 管理者PIN変更</button>
+        <button class="btn btn-full" style="background:#27ae60;color:#fff" onclick="clearModal();showChangePINModal('staff')">👀 スタッフPIN${localStorage.getItem('staffPINHash')?'変更':'設定'}</button>
+      </div>
+      <div style="height:8px"></div>
+      <button class="btn btn-ghost btn-full btn-sm" onclick="clearModal()">キャンセル</button>
+    </div>`);
+}
+
+function showChangePINModal(target='admin'){
+  const pinKey_name = target==='staff' ? 'staffPINHash' : 'adminPINHash';
+  const hasPin = !!localStorage.getItem(pinKey_name);
+  let step = hasPin ? 'current' : 'new';
   let newPinHash='';
   let entry=[];
 
@@ -393,7 +415,8 @@ function showChangePINModal(){
     const dots=Array.from({length:4},(_,i)=>
       `<div style="width:16px;height:16px;border-radius:50%;border:2px solid #1e2a3a;background:${entry[i]!==undefined?'#1e2a3a':'transparent'}"></div>`
     ).join('');
-    const titles={current:'現在のPINを入力',new:'新しいPINを入力',confirm:'新しいPINをもう一度'};
+    const label = target==='staff' ? 'スタッフ' : '管理者';
+    const titles={current:`現在の${label}PINを入力`,new:`新しい${label}PINを入力`,confirm:`新しい${label}PINをもう一度`};
     const mk=(n,cls,fn)=>`<button class="tpad-key ${cls}" ontouchstart="event.preventDefault();${fn}" onclick="${fn}">${n}</button>`;
     document.getElementById('modalRoot').innerHTML=`
       <div class="overlay" onclick="">
@@ -428,13 +451,13 @@ function showChangePINModal(){
     const pin=entry.join(''); entry=[];
     const hash=await hashPIN(pin);
     if(step==='current'){
-      if(hash!==localStorage.getItem('adminPINHash')){showToast('PINが違います');render();return;}
+      if(hash!==localStorage.getItem(pinKey_name)){showToast('PINが違います');render();return;}
       step='new'; render();
     } else if(step==='new'){
       newPinHash=hash; step='confirm'; render();
     } else {
       if(hash!==newPinHash){showToast('PINが一致しません');step='new';newPinHash='';render();return;}
-      localStorage.setItem('adminPINHash',newPinHash);
+      localStorage.setItem(pinKey_name,newPinHash);
       clearModal(); showToast('PINを変更しました');
     }
   };
@@ -484,6 +507,7 @@ function render(){
   clearModal();
   if(IS_STAFF){
     document.getElementById('bottomNav').style.display='none';
+    if(!isStaffAuth){ renderPINScreen('staff'); return; }
     renderWeekly(); return;
   }
   if(!isAdminAuth){renderPINScreen();return;}
@@ -500,7 +524,7 @@ function render(){
 // ════════════════════════════════════════════════════════
 function renderStaffList(){
   setHeader('スタッフ一覧',false,`
-    <button class="btn btn-sm" style="background:#7f8c8d;color:#fff;font-size:11px" onclick="showChangePINModal()">PIN変更</button>
+    <button class="btn btn-sm" style="background:#7f8c8d;color:#fff;font-size:11px" onclick="showPINSettingsModal()">PIN</button>
     <button class="btn btn-sm" style="background:#2980b9;color:#fff;font-size:11px" onclick="showQRModal()">QR</button>`);
   const el=document.getElementById('appContent');
   if(!db.staff.length){
