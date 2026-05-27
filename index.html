@@ -1,0 +1,1033 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>シフト管理</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#1e2a3a">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="シフト管理">
+  <link rel="apple-touch-icon" href="icon.svg">
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Hiragino Sans',sans-serif;background:#f0f2f5;color:#1a1a1a;height:100dvh;display:flex;flex-direction:column;overflow:hidden}
+
+    #appHeader{background:#1e2a3a;color:#fff;display:flex;align-items:center;min-height:52px;padding:0 12px;gap:8px;flex-shrink:0}
+    #backBtn{background:none;border:none;color:#fff;font-size:22px;cursor:pointer;padding:6px 8px;display:none}
+    #headerTitle{font-size:17px;font-weight:700;flex:1}
+    #headerActions{display:flex;gap:6px;align-items:center}
+
+    #appContent{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch}
+
+    #bottomNav{display:flex;background:#fff;border-top:1px solid #e0e0e0;flex-shrink:0}
+    .nav-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;border:none;background:none;color:#aaa;font-size:10px;padding:8px 0;cursor:pointer}
+    .nav-btn.active{color:#e94560}
+    .nav-btn svg{width:22px;height:22px}
+
+    .card{background:#fff;border-radius:14px;margin:10px 12px;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+    .section-title{font-size:12px;font-weight:700;color:#888;letter-spacing:.5px;padding:14px 16px 6px}
+
+    .btn{display:inline-flex;align-items:center;justify-content:center;gap:5px;padding:10px 18px;border-radius:10px;border:none;font-size:14px;font-weight:600;cursor:pointer}
+    .btn-primary{background:#1e2a3a;color:#fff}
+    .btn-danger{background:#e74c3c;color:#fff}
+    .btn-ghost{background:transparent;border:2px solid #1e2a3a;color:#1e2a3a}
+    .btn-warn{background:#f39c12;color:#fff}
+    .btn-success{background:#27ae60;color:#fff}
+    .btn-accent{background:#e94560;color:#fff}
+    .btn-full{width:100%}
+    .btn-sm{padding:6px 12px;font-size:12px}
+
+    .fab{position:fixed;bottom:76px;right:18px;width:52px;height:52px;border-radius:50%;background:#e94560;color:#fff;border:none;font-size:24px;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(233,69,96,.45);cursor:pointer;z-index:50}
+
+    .form-group{margin-bottom:14px}
+    .form-label{display:block;font-size:12px;font-weight:700;color:#666;margin-bottom:5px}
+    .form-input{width:100%;padding:11px;border:2px solid #e8e8e8;border-radius:10px;font-size:16px;color:#1a1a1a;background:#fff;appearance:none;-webkit-appearance:none}
+    .form-input:focus{outline:none;border-color:#1e2a3a}
+
+    /* Color picker */
+    .color-swatches{display:flex;flex-wrap:wrap;gap:10px;padding:4px 0}
+    .color-swatch{width:34px;height:34px;border-radius:50%;cursor:pointer;border:3px solid transparent;transition:transform .15s}
+    .color-swatch.selected{border-color:#1e2a3a;transform:scale(1.18)}
+
+    /* Staff list */
+    .staff-item{display:flex;align-items:center;padding:13px 16px;border-bottom:1px solid #f5f5f5;cursor:pointer}
+    .staff-item:last-child{border-bottom:none}
+    .staff-avatar{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;color:#fff;flex-shrink:0;margin-right:12px}
+
+    /* Avail rows */
+    .avail-row{display:flex;align-items:center;padding:9px 0;border-bottom:1px solid #f5f5f5;gap:8px}
+    .avail-row:last-child{border-bottom:none}
+    .avail-day-lbl{width:24px;font-weight:700;font-size:14px;text-align:center;flex-shrink:0}
+    .toggle-sw{position:relative;width:44px;height:24px;flex-shrink:0}
+    .toggle-sw input{opacity:0;width:0;height:0}
+    .toggle-slider{position:absolute;cursor:pointer;inset:0;background:#ccc;border-radius:24px;transition:.2s}
+    .toggle-slider:before{position:absolute;content:"";height:18px;width:18px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.2s}
+    .toggle-sw input:checked+.toggle-slider{background:#27ae60}
+    .toggle-sw input:checked+.toggle-slider:before{transform:translateX(20px)}
+    .avail-times{display:flex;align-items:center;gap:5px;flex:1}
+    .avail-times select{flex:1;min-width:0;padding:6px 2px;border:1.5px solid #e0e0e0;border-radius:7px;font-size:12px;background:#fff;appearance:none;-webkit-appearance:none;text-align:center}
+
+    /* ── WEEK VIEW (percentage-based, no horizontal scroll) ── */
+    .wk-wrapper{overflow-y:auto;-webkit-overflow-scrolling:touch}
+    .wk-sticky{position:sticky;top:0;z-index:20;background:#fff;border-bottom:2px solid #e8e8e8}
+    .wk-nav{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;gap:8px}
+    .wk-status{display:flex;align-items:center;justify-content:space-between;padding:4px 12px 8px;gap:8px}
+    .wk-timehdr{display:flex;border-top:1px solid #eee}
+    .wk-timehdr-corner{width:52px;flex-shrink:0;border-right:1px solid #eee}
+    .wk-ticks{flex:1;position:relative;height:20px;overflow:hidden}
+    .wk-tick{position:absolute;font-size:9px;color:#aaa;transform:translateX(-50%);top:3px;white-space:nowrap}
+
+    .wk-day-row{display:flex;border-bottom:2px solid #c8ccd2;min-height:28px}
+    .wk-day-label{width:52px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:center;border-right:1px solid #eee;padding:4px 0;gap:1px;position:relative}
+    .wk-day-label.today{background:#fff5f6}
+    .wk-day-dow{font-weight:800;font-size:13px}
+    .wk-day-date{font-size:9px;color:#aaa}
+    .wk-bars{flex:1;position:relative;overflow:hidden}
+    .wk-grid-line{position:absolute;top:0;bottom:0;width:1px}
+
+    /* Shift bars */
+    .wk-bar{position:absolute;height:12px;border-radius:4px;display:flex;align-items:center;overflow:hidden;padding:0 2px;cursor:pointer;transition:opacity .1s}
+    .wk-bar:active{opacity:.7}
+    .wk-bar-t{font-size:8px;color:rgba(255,255,255,.92);flex-shrink:0;line-height:1}
+    .wk-bar-n{font-size:8px;color:#fff;font-weight:700;flex:1;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1}
+
+    /* Emergency indicators */
+    .wk-bar.em-absent{opacity:.25;text-decoration:line-through}
+    .wk-bar.em-late::before{content:"遅";position:absolute;left:0;top:0;bottom:0;width:12px;background:rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;font-size:7px;color:#fff;font-weight:700}
+    .wk-bar.em-early::after{content:"早";position:absolute;right:0;top:0;bottom:0;width:12px;background:rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;font-size:7px;color:#fff;font-weight:700}
+    .wk-bar.em-spot{border:2px solid #fff;box-shadow:0 0 0 2px currentColor}
+
+    /* Confirm bar */
+    .confirm-bar{position:sticky;bottom:0;padding:10px 14px;background:#fff;border-top:1px solid #eee;z-index:15}
+
+    /* Monthly */
+    .month-nav{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;background:#fff;border-bottom:1px solid #eee}
+    .monthly-staff{padding:12px 16px;border-bottom:1px solid #f5f5f5}
+    .monthly-staff:last-child{border-bottom:none}
+    .hours-bar{height:5px;background:#eee;border-radius:3px;margin-top:7px;overflow:hidden}
+    .hours-fill{height:100%;border-radius:3px}
+
+    /* Modal */
+    .overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;display:flex;align-items:flex-end}
+    .sheet{background:#fff;border-radius:20px 20px 0 0;width:100%;max-height:90dvh;overflow-y:auto}
+    .sheet-handle{width:36px;height:4px;background:#ddd;border-radius:2px;margin:12px auto 0}
+    .sheet-body{padding:14px 18px 28px}
+    .sheet-title{font-size:16px;font-weight:700;margin-bottom:16px}
+
+    /* Weekly conditions grid */
+    .wcond-table{width:100%;border-collapse:collapse;font-size:11px}
+    .wcond-table th{padding:5px 2px;text-align:center;font-weight:700;color:#666}
+    .wcond-table td{padding:5px 2px;text-align:center}
+    .wcond-dot{width:10px;height:10px;border-radius:50%;margin:0 auto;cursor:pointer}
+    .wcond-dot.on{border:none}
+    .wcond-dot.off{background:#eee!important;border:2px solid #ddd}
+
+    /* Misc */
+    .badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600}
+    .badge-green{background:#eafaf1;color:#27ae60}
+    .badge-gray{background:#f0f0f0;color:#999}
+    .badge-blue{background:#ebf5fb;color:#2980b9}
+    .badge-orange{background:#fef5e7;color:#e67e22}
+    .empty-state{text-align:center;padding:48px 24px;color:#bbb}
+    .nav-arrow{width:32px;height:32px;border-radius:50%;border:1.5px solid #ddd;background:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px;color:#555;flex-shrink:0}
+    .toast{position:fixed;bottom:84px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.78);color:#fff;padding:9px 18px;border-radius:20px;font-size:13px;z-index:1000;white-space:nowrap;pointer-events:none}
+    .flex1{flex:1}
+    .hidden{display:none!important}
+    .sep-line{height:1px;background:#f0f0f0;margin:10px 0}
+
+    /* Time picker button */
+    .time-btn{flex:1;padding:9px 4px;border:1.5px solid #e0e0e0;border-radius:9px;font-size:14px;font-weight:700;background:#f8f8f8;color:#1e2a3a;cursor:pointer;text-align:center;min-width:0}
+    .time-btn:active{background:#dce0e5}
+
+    /* Numeric keypad */
+    .tpad-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:500;display:flex;align-items:flex-end}
+    .tpad-sheet{background:#e8ecf0;width:100%;border-radius:20px 20px 0 0;padding:14px 12px 36px;user-select:none;-webkit-user-select:none}
+    .tpad-display{background:#fff;border-radius:14px;padding:16px 12px 10px;text-align:center;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+    .tpad-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+    .tpad-key{background:#fff;border:none;border-radius:12px;height:56px;font-size:22px;font-weight:600;cursor:pointer;box-shadow:0 1px 2px rgba(0,0,0,.12);-webkit-tap-highlight-color:transparent}
+    .tpad-key:active{background:#d1d5db}
+    .tpad-back{background:#adb5bd;color:#fff}
+    .tpad-back:active{background:#909ba3}
+    .tpad-ok{background:#1e2a3a;color:#fff;font-size:18px}
+    .tpad-ok:active{background:#2c3e50}
+  </style>
+</head>
+<body>
+
+<div id="appHeader">
+  <button id="backBtn" onclick="handleBack()">&#8592;</button>
+  <span id="headerTitle">シフト管理</span>
+  <div id="headerActions"></div>
+</div>
+<div id="appContent"></div>
+<nav id="bottomNav">
+  <button class="nav-btn active" data-tab="staff" onclick="switchTab('staff')">
+    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+    スタッフ
+  </button>
+  <button class="nav-btn" data-tab="week" onclick="switchTab('week')">
+    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z"/></svg>
+    週シフト
+  </button>
+  <button class="nav-btn" data-tab="month" onclick="switchTab('month')">
+    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"/></svg>
+    月集計
+  </button>
+</nav>
+<div id="modalRoot"></div>
+<div id="tpadRoot"></div>
+
+<script>
+// ════════════════════════════════════════════════════════
+//  CONSTANTS
+// ════════════════════════════════════════════════════════
+const DAYS    = ['日','月','火','水','木','金','土'];
+const DCOLORS = ['#e74c3c','#3498db','#3498db','#3498db','#3498db','#2ecc71','#9b59b6'];
+const STAFF_COLORS = [
+  '#E74C3C','#3498DB','#2ECC71','#F39C12','#9B59B6',
+  '#1ABC9C','#E91E63','#FF9800','#27AE60','#00BCD4',
+  '#FF5722','#8E44AD','#16A085','#D35400','#2980B9'
+];
+// Timeline: 8:00 → 翌8:00
+const TL_START = 8*60, TL_END = 32*60, TL_DUR = 24*60;
+const BAR_H = 12, BAR_SLOT = 18, DAY_PAD = 5;
+
+// ════════════════════════════════════════════════════════
+//  DB
+// ════════════════════════════════════════════════════════
+let db = { staff: [], weeks: {} };
+function saveDB(){ localStorage.setItem('shiftv5', JSON.stringify(db)); }
+function loadDB(){
+  try{ const d=localStorage.getItem('shiftv5'); if(d) db=JSON.parse(d); } catch(e){}
+}
+function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2); }
+
+// ════════════════════════════════════════════════════════
+//  DATE (timezone-safe)
+// ════════════════════════════════════════════════════════
+function parseDate(s){
+  if(s instanceof Date) return s;
+  const [y,m,d]=String(s).split('-').map(Number);
+  return new Date(y,m-1,d);
+}
+function fmt(d){
+  const dt=d instanceof Date?d:parseDate(d);
+  return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+}
+function addDays(d,n){ const dt=d instanceof Date?new Date(d):parseDate(d); dt.setDate(dt.getDate()+n); return dt; }
+function dow(d){ return (d instanceof Date?d:parseDate(d)).getDay(); }
+function fmtJP(d){ const dt=d instanceof Date?d:parseDate(d); return `${dt.getMonth()+1}/${dt.getDate()}`; }
+function getMonday(d){
+  const dt=d instanceof Date?new Date(d):parseDate(d);
+  const day=dt.getDay();
+  dt.setDate(dt.getDate()-(day===0?6:day-1));
+  dt.setHours(0,0,0,0);
+  return dt;
+}
+function todayStr(){ return fmt(new Date()); }
+
+// ════════════════════════════════════════════════════════
+//  TIME
+// ════════════════════════════════════════════════════════
+function toMin(t){ if(!t)return 0; const[h,m]=t.split(':').map(Number); return h*60+(m||0); }
+function toTime(m){ return `${String(Math.floor(m/60)).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`; }
+function dispTime(t){
+  const m=toMin(t);
+  return m>=24*60?`翌${toTime(m-24*60)}`:t;
+}
+function calcHours(start,end,breakMin=0){
+  let s=toMin(start),e=toMin(end);
+  if(e<=s) e+=24*60;
+  return Math.max((e-s-breakMin)/60,0);
+}
+function genStartOpts(){ const o=[]; for(let m=0;m<24*60;m+=30) o.push(toTime(m)); return o; }
+function genEndOpts(){ const o=[]; for(let m=30;m<=32*60;m+=30) o.push(toTime(m)); return o; }
+const START_OPTS=genStartOpts(), END_OPTS=genEndOpts();
+function selOpts(opts,val){ return opts.map(t=>`<option value="${t}"${t===val?' selected':''}>${dispTime(t)}</option>`).join(''); }
+
+// ════════════════════════════════════════════════════════
+//  SCHEDULE LOGIC
+// ════════════════════════════════════════════════════════
+function defaultAvail(){
+  const a={}; for(let i=0;i<7;i++) a[i]={available:false,start:'22:00',end:'30:00'}; return a;
+}
+
+function ensureWeek(wk){
+  if(!db.weeks[wk]) db.weeks[wk]={confirmed:false,overrides:[]};
+  if(!db.weeks[wk].overrides) db.weeks[wk].overrides=[];
+  return db.weeks[wk];
+}
+
+// Returns {start,end} or null; changeType tracks planning vs emergency
+function getShift(staff,dateStr,wk){
+  const week=db.weeks[wk]||{};
+  const ov=(week.overrides||[]).find(o=>o.staffId===staff.id&&o.date===dateStr);
+  if(ov!==undefined) return ov.shift; // null=off, {start,end}=custom
+  const base=staff.availability[dow(dateStr)];
+  if(!base||!base.available) return null;
+  return {start:base.start,end:base.end};
+}
+
+function getOverrideMeta(staffId,dateStr,wk){
+  return (db.weeks[wk]?.overrides||[]).find(o=>o.staffId===staffId&&o.date===dateStr);
+}
+
+function setOverride(staffId,dateStr,wk,shift,changeType='planned'){
+  const week=ensureWeek(wk);
+  const idx=week.overrides.findIndex(o=>o.staffId===staffId&&o.date===dateStr);
+  const entry={staffId,date:dateStr,shift,changeType};
+  if(idx>=0) week.overrides[idx]=entry; else week.overrides.push(entry);
+  saveDB();
+}
+
+function clearOverride(staffId,dateStr,wk){
+  const week=db.weeks[wk]; if(!week) return;
+  week.overrides=week.overrides.filter(o=>!(o.staffId===staffId&&o.date===dateStr));
+  saveDB();
+}
+
+function isConfirmed(wk){ return !!(db.weeks[wk]?.confirmed); }
+function confirmWeek(wk){ ensureWeek(wk).confirmed=true; saveDB(); }
+function unconfirmWeek(wk){ ensureWeek(wk).confirmed=false; saveDB(); }
+
+// ════════════════════════════════════════════════════════
+//  MONTHLY CALC
+// ════════════════════════════════════════════════════════
+function monthlyStats(year,month){
+  return db.staff.map(s=>{
+    let hours=0,days=0;
+    const end=new Date(year,month,0);
+    for(let d=new Date(year,month-1,1);d<=end;d.setDate(d.getDate()+1)){
+      const ds=fmt(d),wk=fmt(getMonday(d));
+      const sh=getShift(s,ds,wk);
+      if(!sh) continue;
+      const meta=getOverrideMeta(s.id,ds,wk);
+      if(meta?.changeType==='absent') continue; // 急遽休みは0時間
+      hours+=calcHours(sh.start,sh.end,s.breakMinutes||0);
+      days++;
+    }
+    return {staff:s,hours,days,wage:Math.round(hours*s.hourlyWage)};
+  });
+}
+
+// ════════════════════════════════════════════════════════
+//  STATE
+// ════════════════════════════════════════════════════════
+let currentTab='staff';
+let weekMonday=fmt(getMonday(new Date()));
+let curMonth={year:new Date().getFullYear(),month:new Date().getMonth()+1};
+let editingId=null;
+let selectedColor=STAFF_COLORS[0];
+// weekly condition draft: {staffId: {0:bool,...6:bool}}
+let wcondDraft={};
+
+// ════════════════════════════════════════════════════════
+//  NAV
+// ════════════════════════════════════════════════════════
+function switchTab(tab){
+  currentTab=tab;
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));
+  render();
+}
+function setHeader(title,back,actions=''){
+  document.getElementById('headerTitle').textContent=title;
+  document.getElementById('backBtn').style.display=back?'block':'none';
+  document.getElementById('headerActions').innerHTML=actions;
+  document.getElementById('bottomNav').style.display=back?'none':'flex';
+}
+function handleBack(){ editingId=null; render(); }
+function render(){
+  clearModal();
+  if(editingId!==null){renderStaffEdit();return;}
+  switch(currentTab){
+    case 'staff': renderStaffList(); break;
+    case 'week':  renderWeekly();   break;
+    case 'month': renderMonthly();  break;
+  }
+}
+
+// ════════════════════════════════════════════════════════
+//  STAFF LIST
+// ════════════════════════════════════════════════════════
+function renderStaffList(){
+  setHeader('スタッフ一覧',false);
+  const el=document.getElementById('appContent');
+  if(!db.staff.length){
+    el.innerHTML=`<div class="empty-state"><div style="font-size:48px;margin-bottom:12px">👥</div><div>スタッフを追加してください</div></div>`;
+  } else {
+    el.innerHTML=`
+      <div class="section-title">スタッフ（${db.staff.length}名）</div>
+      <div class="card" style="padding:0;overflow:hidden">
+        ${db.staff.map(s=>{
+          const avDays=Object.entries(s.availability||{}).filter(([,v])=>v.available).map(([k])=>DAYS[k]).join('');
+          return `<div class="staff-item" onclick="openEdit('${s.id}')">
+            <div class="staff-avatar" style="background:${s.color}">${s.name[0]}</div>
+            <div class="flex1">
+              <div style="font-size:15px;font-weight:600">${s.name}</div>
+              <div style="font-size:12px;color:#888;margin-top:2px">¥${s.hourlyWage.toLocaleString()}/h　休憩${s.breakMinutes||0}分　${avDays||'出勤日なし'}</div>
+            </div>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="#ccc"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+          </div>`;
+        }).join('')}
+      </div>
+      <div style="height:80px"></div>`;
+  }
+  document.getElementById('modalRoot').innerHTML=`<button class="fab" onclick="openEdit(null)">＋</button>`;
+}
+
+function openEdit(id){
+  editingId=id||'__new__';
+  selectedColor=id?(db.staff.find(s=>s.id===id)?.color||STAFF_COLORS[0]):STAFF_COLORS[db.staff.length%STAFF_COLORS.length];
+  renderStaffEdit();
+}
+
+// ════════════════════════════════════════════════════════
+//  STAFF EDIT
+// ════════════════════════════════════════════════════════
+function renderStaffEdit(){
+  const isNew=editingId==='__new__';
+  const s=isNew?null:db.staff.find(x=>x.id===editingId);
+  const avail=s?s.availability:defaultAvail();
+  setHeader(isNew?'スタッフ追加':'スタッフ編集',true,
+    isNew?'':`<button class="btn btn-sm btn-danger" onclick="confirmDelete('${s?.id}')">削除</button>`);
+
+  const dayRows=[0,1,2,3,4,5,6].map(i=>{
+    const a=avail[i]||{available:false,start:'22:00',end:'30:00'};
+    return `<div class="avail-row">
+      <span class="avail-day-lbl" style="color:${DCOLORS[i]}">${DAYS[i]}</span>
+      <label class="toggle-sw">
+        <input type="checkbox" id="dc${i}" ${a.available?'checked':''} onchange="toggleDay(${i},this.checked)">
+        <span class="toggle-slider"></span>
+      </label>
+      <div class="avail-times" id="dt${i}" style="${a.available?'':'opacity:.3;pointer-events:none'}">
+        <input type="hidden" id="ds${i}" value="${a.start}">
+        <button type="button" class="time-btn" id="b_ds${i}" onclick="showTimePad('ds${i}','${a.start}',false,'${DAYS[i]} 開始時間')">${a.start}</button>
+        <span style="font-size:11px;color:#aaa;flex-shrink:0">〜</span>
+        <input type="hidden" id="de${i}" value="${a.end}">
+        <button type="button" class="time-btn" id="b_de${i}" onclick="showTimePad('de${i}','${a.end}',true,'${DAYS[i]} 終了時間')">${dispTime(a.end)}</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  const swatches=STAFF_COLORS.map(c=>
+    `<div class="color-swatch ${c===selectedColor?'selected':''}" style="background:${c}" onclick="pickColor('${c}')"></div>`
+  ).join('');
+
+  document.getElementById('appContent').innerHTML=`
+    <div style="padding:14px">
+      <div class="form-group"><label class="form-label">名前</label>
+        <input class="form-input" type="text" id="sName" value="${s?.name||''}" placeholder="例：田中" maxlength="8"></div>
+      <div class="form-group"><label class="form-label">時給（円）</label>
+        <input class="form-input" type="number" id="sWage" value="${s?.hourlyWage||''}" placeholder="1200" min="0"></div>
+      <div class="form-group"><label class="form-label">休憩時間（分）</label>
+        <input class="form-input" type="number" id="sBreak" value="${s?.breakMinutes??60}" placeholder="60" min="0" max="240"></div>
+      <div class="form-group"><label class="form-label">カラー</label>
+        <div class="color-swatches" id="colorSwatches">${swatches}</div></div>
+      <div class="form-group"><label class="form-label">基本シフト（曜日と時間）</label>
+        <div class="card" style="margin:0;padding:6px 10px">${dayRows}</div></div>
+      <button class="btn btn-primary btn-full" onclick="saveStaff()">${isNew?'追加する':'保存する'}</button>
+      <div style="height:8px"></div>
+      <button class="btn btn-ghost btn-full" onclick="handleBack()">キャンセル</button>
+    </div><div style="height:40px"></div>`;
+  document.getElementById('modalRoot').innerHTML='';
+}
+
+function pickColor(c){
+  selectedColor=c;
+  document.querySelectorAll('.color-swatch').forEach(el=>el.classList.toggle('selected',el.style.background===c||el.style.backgroundColor===c));
+}
+function toggleDay(i,checked){
+  const el=document.getElementById(`dt${i}`);
+  if(el){el.style.opacity=checked?'1':'.3';el.style.pointerEvents=checked?'auto':'none';}
+}
+function saveStaff(){
+  const name=document.getElementById('sName').value.trim();
+  const wage=parseInt(document.getElementById('sWage').value);
+  const breakMin=parseInt(document.getElementById('sBreak').value)||0;
+  if(!name){showToast('名前を入力してください');return;}
+  if(!wage||wage<0){showToast('時給を入力してください');return;}
+  const avail={};
+  for(let i=0;i<7;i++){
+    const ch=document.getElementById(`dc${i}`),st=document.getElementById(`ds${i}`),en=document.getElementById(`de${i}`);
+    avail[i]={available:ch?.checked||false,start:st?.value||'22:00',end:en?.value||'30:00'};
+  }
+  if(editingId==='__new__'){
+    db.staff.push({id:uid(),name,hourlyWage:wage,breakMinutes:breakMin,color:selectedColor,availability:avail});
+  } else {
+    const idx=db.staff.findIndex(s=>s.id===editingId);
+    if(idx>=0) db.staff[idx]={...db.staff[idx],name,hourlyWage:wage,breakMinutes:breakMin,color:selectedColor,availability:avail};
+  }
+  saveDB(); editingId=null; renderStaffList(); showToast('保存しました');
+}
+function confirmDelete(id){
+  if(!confirm('このスタッフを削除しますか？'))return;
+  db.staff=db.staff.filter(s=>s.id!==id); saveDB(); editingId=null; renderStaffList(); showToast('削除しました');
+}
+
+// ════════════════════════════════════════════════════════
+//  WEEKLY VIEW
+// ════════════════════════════════════════════════════════
+function renderWeekly(){
+  const mon=parseDate(weekMonday);
+  const dates=Array.from({length:7},(_,i)=>fmt(addDays(mon,i)));
+  const wLabel=`${fmtJP(mon)} 〜 ${fmtJP(dates[6])}`;
+  const confirmed=isConfirmed(weekMonday);
+
+  // Header actions
+  let actions='';
+  if(!confirmed){
+    actions=`<button class="btn btn-sm" style="background:#7f8c8d;color:#fff;font-size:11px" onclick="showWeekCondModal()">今週条件</button>`;
+  } else {
+    actions=`<button class="btn btn-sm btn-ghost" style="font-size:11px;border-color:#aaa;color:#aaa" onclick="doUnconfirm()">解除</button>
+             <button class="btn btn-sm btn-accent" style="font-size:11px" onclick="showSpotModal()">急遽出勤</button>`;
+  }
+  setHeader('週間シフト',false,actions);
+
+  // Time header ticks (every 4h)
+  const ticks=[];
+  for(let h=8;h<=32;h+=4){
+    const pct=(h-8)/24*100;
+    const lbl=h>=24?`翌${h-24}時`:`${h}時`;
+    ticks.push(`<div class="wk-tick" style="left:${pct}%">${lbl}</div>`);
+  }
+
+  // Day rows
+  const dayRows=dates.map(dateStr=>{
+    const d=dow(dateStr);
+    const isToday=dateStr===todayStr();
+    const working=db.staff.filter(s=>getShift(s,dateStr,weekMonday)!==null);
+    const rowH=Math.max(working.length*BAR_SLOT+DAY_PAD*2,28);
+
+    // Grid lines every 4h
+    const gridLines=[0,25,50,75,100].map(pct=>
+      `<div class="wk-grid-line" style="left:${pct}%;background:${pct===0||pct===100?'#e0e0e0':'#f0f0f0'}"></div>`
+    ).join('');
+
+    // Bars
+    const bars=working.map((s,i)=>{
+      const sh=getShift(s,dateStr,weekMonday);
+      const meta=getOverrideMeta(s.id,dateStr,weekMonday);
+      const ctype=meta?.changeType||'planned';
+
+      let sMin=toMin(sh.start),eMin=toMin(sh.end);
+      if(eMin<=sMin) eMin+=24*60;
+      if(sMin<TL_START) sMin+=24*60;
+      const clampS=Math.max(sMin,TL_START),clampE=Math.min(eMin,TL_END);
+      const leftPct=(clampS-TL_START)/TL_DUR*100;
+      const wPct=(clampE-clampS)/TL_DUR*100;
+      const top=DAY_PAD+i*BAR_SLOT;
+      const wide=wPct>12;
+
+      let emClass='';
+      if(ctype==='absent') emClass='em-absent';
+      else if(ctype==='late') emClass='em-late';
+      else if(ctype==='earlyLeave') emClass='em-early';
+      else if(ctype==='spot') emClass='em-spot';
+
+      const clickFn=confirmed
+        ?`openEmergencyModal('${s.id}','${dateStr}')`
+        :`openShiftEdit('${s.id}','${dateStr}')`;
+
+      return `<div class="wk-bar ${emClass}" style="left:${leftPct}%;width:${wPct}%;top:${top}px;background:${s.color}" onclick="${clickFn}">
+        ${wide?`<span class="wk-bar-t">${dispTime(sh.start)}</span>`:''}
+        <span class="wk-bar-n">${s.name}</span>
+        ${wide?`<span class="wk-bar-t">${dispTime(sh.end)}</span>`:''}
+      </div>`;
+    }).join('');
+
+    return `<div class="wk-day-row" style="min-height:${rowH}px">
+      <div class="wk-day-label ${isToday?'today':''}" style="min-height:${rowH}px">
+        <span class="wk-day-dow" style="color:${DCOLORS[d]}">${DAYS[d]}</span>
+        <span class="wk-day-date">${fmtJP(dateStr)}</span>
+        ${isToday?`<span style="font-size:7px;color:#e94560;font-weight:800">今日</span>`:''}
+      </div>
+      <div class="wk-bars" style="min-height:${rowH}px">
+        ${gridLines}${bars}
+        ${!working.length?`<span style="position:absolute;top:50%;left:8px;transform:translateY(-50%);font-size:10px;color:#ddd">出勤なし</span>`:''}
+      </div>
+    </div>`;
+  }).join('');
+
+  const confirmBtn=!confirmed
+    ?`<div class="confirm-bar"><button class="btn btn-success btn-full" style="font-size:15px" onclick="doConfirm()">✓ このシフトを確定する</button></div>`
+    :'';
+
+  document.getElementById('appContent').innerHTML=`
+    <div class="wk-sticky">
+      <div class="wk-nav">
+        <button class="nav-arrow" onclick="changeWeek(-1)">&#8249;</button>
+        <span style="font-size:14px;font-weight:700">${wLabel}</span>
+        <button class="nav-arrow" onclick="changeWeek(1)">&#8250;</button>
+      </div>
+      <div class="wk-status">
+        <span class="badge ${confirmed?'badge-green':'badge-blue'}">
+          ${confirmed?'✓ 確定済み':'計画中'}
+        </span>
+        ${confirmed?'':`<span style="font-size:11px;color:#aaa">バーをタップで編集・削除</span>`}
+        ${confirmed?`<span style="font-size:11px;color:#aaa">バーをタップで急遽対応</span>`:''}
+      </div>
+      <div class="wk-timehdr">
+        <div class="wk-timehdr-corner"></div>
+        <div class="wk-ticks">${ticks.join('')}</div>
+      </div>
+    </div>
+    <div>${dayRows}</div>
+    ${confirmBtn}
+    <div style="height:20px"></div>`;
+  document.getElementById('modalRoot').innerHTML='';
+}
+
+function changeWeek(d){
+  const dt=parseDate(weekMonday); dt.setDate(dt.getDate()+d*7);
+  weekMonday=fmt(dt); renderWeekly();
+}
+function doConfirm(){ confirmWeek(weekMonday); renderWeekly(); showToast('シフトを確定しました'); }
+function doUnconfirm(){
+  if(!confirm('確定を解除してシフトを編集可能にしますか？'))return;
+  unconfirmWeek(weekMonday); renderWeekly(); showToast('確定を解除しました');
+}
+
+// ════════════════════════════════════════════════════════
+//  WEEKLY CONDITIONS MODAL
+// ════════════════════════════════════════════════════════
+function showWeekCondModal(){
+  if(!db.staff.length){showToast('スタッフを先に登録してください');return;}
+  const mon=parseDate(weekMonday);
+  const dates=Array.from({length:7},(_,i)=>fmt(addDays(mon,i)));
+
+  // Init draft from current overrides + base
+  wcondDraft={};
+  db.staff.forEach(s=>{
+    wcondDraft[s.id]={};
+    dates.forEach(ds=>{
+      const sh=getShift(s,ds,weekMonday);
+      wcondDraft[s.id][ds]=sh!==null;
+    });
+  });
+
+  const dayHeaders=dates.map(ds=>`<th style="color:${DCOLORS[dow(ds)]}">${DAYS[dow(ds)]}<br><span style="font-weight:400;color:#aaa;font-size:9px">${fmtJP(ds)}</span></th>`).join('');
+
+  const rows=db.staff.map(s=>`
+    <tr id="wcrow_${s.id}">
+      <td style="text-align:left;padding:5px 4px;white-space:nowrap">
+        <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${s.color};margin-right:4px;vertical-align:middle"></span>${s.name}
+      </td>
+      ${dates.map(ds=>`
+        <td>
+          <div class="wcond-dot ${wcondDraft[s.id][ds]?'on':'off'}"
+            style="background:${wcondDraft[s.id][ds]?s.color:'#eee'}"
+            onclick="toggleWcond('${s.id}','${ds}','${s.color}')">
+          </div>
+        </td>`).join('')}
+    </tr>`).join('');
+
+  showModal(`
+    <div class="sheet-handle"></div>
+    <div class="sheet-body">
+      <div class="sheet-title">今週の条件入力</div>
+      <p style="font-size:12px;color:#888;margin-bottom:12px">●＝出勤可　○＝出勤不可。タップで切り替え。</p>
+      <div style="overflow-x:auto">
+        <table class="wcond-table">
+          <thead><tr><th style="text-align:left">スタッフ</th>${dayHeaders}</tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+      <div style="height:14px"></div>
+      <button class="btn btn-primary btn-full" onclick="applyWeekCond()">この条件でシフト生成</button>
+      <div style="height:8px"></div>
+      <button class="btn btn-ghost btn-full btn-sm" onclick="clearModal()">キャンセル</button>
+    </div>`);
+}
+
+function toggleWcond(staffId,dateStr,color){
+  wcondDraft[staffId][dateStr]=!wcondDraft[staffId][dateStr];
+  const el=document.querySelector(`#wcrow_${staffId} [onclick*="${dateStr}"]`);
+  if(el){
+    const on=wcondDraft[staffId][dateStr];
+    el.className=`wcond-dot ${on?'on':'off'}`;
+    el.style.background=on?color:'#eee';
+  }
+}
+
+function applyWeekCond(){
+  // Apply draft as overrides
+  const mon=parseDate(weekMonday);
+  const dates=Array.from({length:7},(_,i)=>fmt(addDays(mon,i)));
+  db.staff.forEach(s=>{
+    dates.forEach(ds=>{
+      const base=s.availability[dow(ds)];
+      const baseAvail=!!(base&&base.available);
+      const draft=wcondDraft[s.id]?.[ds]??baseAvail;
+      if(draft===baseAvail){
+        clearOverride(s.id,ds,weekMonday); // 変更なし→override削除
+      } else if(!draft){
+        setOverride(s.id,ds,weekMonday,null,'planned'); // 出勤→休み
+      } else {
+        // 休み→出勤（基本時間を使う）
+        const sh=base?{start:base.start,end:base.end}:{start:'22:00',end:'30:00'};
+        setOverride(s.id,ds,weekMonday,sh,'planned');
+      }
+    });
+  });
+  clearModal(); renderWeekly(); showToast('条件を反映しました');
+}
+
+// ════════════════════════════════════════════════════════
+//  SHIFT EDIT (計画中)
+// ════════════════════════════════════════════════════════
+function openShiftEdit(staffId,dateStr){
+  const s=db.staff.find(x=>x.id===staffId);
+  const sh=getShift(s,dateStr,weekMonday);
+  const base=s.availability[dow(dateStr)];
+  const isOff=sh===null;
+  const curStart=sh?.start||base?.start||'22:00';
+  const curEnd=sh?.end||base?.end||'30:00';
+
+  showModal(`
+    <div class="sheet-handle"></div>
+    <div class="sheet-body">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+        <div class="staff-avatar" style="background:${s.color};width:36px;height:36px;font-size:14px">${s.name[0]}</div>
+        <div><div style="font-weight:700;font-size:15px">${s.name}</div>
+          <div style="font-size:12px;color:#888">${fmtJP(dateStr)}（${DAYS[dow(dateStr)]}）</div></div>
+        <span class="badge ${isOff?'badge-gray':'badge-green'}" style="margin-left:auto">${isOff?'休み':'出勤'}</span>
+      </div>
+      <div id="timeSection" ${isOff?'style="opacity:.4;pointer-events:none"':''}>
+        <div class="form-group"><label class="form-label">開始</label>
+          <select class="form-input" id="editStart">${selOpts(START_OPTS,curStart)}</select></div>
+        <div class="form-group"><label class="form-label">終了</label>
+          <select class="form-input" id="editEnd">${selOpts(END_OPTS,curEnd)}</select></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        ${isOff
+          ?`<button class="btn btn-primary btn-full" onclick="restoreShift('${staffId}','${dateStr}')">出勤に戻す</button>`
+          :`<button class="btn btn-primary btn-full" onclick="saveShiftEdit('${staffId}','${dateStr}')">時間を保存</button>
+            <button class="btn btn-warn btn-full" onclick="setPlanOff('${staffId}','${dateStr}')">この日は休みにする</button>`
+        }
+        ${(sh&&base?.available&&(sh.start!==base.start||sh.end!==base.end))
+          ?`<button class="btn btn-ghost btn-full btn-sm" onclick="resetToBase('${staffId}','${dateStr}')">基本シフトに戻す</button>`:''}
+        <button class="btn btn-ghost btn-full btn-sm" onclick="clearModal()">キャンセル</button>
+      </div>
+    </div>`);
+}
+
+function saveShiftEdit(staffId,dateStr){
+  const start=document.getElementById('editStart').value;
+  const end=document.getElementById('editEnd').value;
+  setOverride(staffId,dateStr,weekMonday,{start,end},'planned');
+  clearModal(); renderWeekly(); showToast('更新しました');
+}
+function setPlanOff(staffId,dateStr){
+  setOverride(staffId,dateStr,weekMonday,null,'planned');
+  clearModal(); renderWeekly(); showToast('休みにしました');
+}
+function restoreShift(staffId,dateStr){
+  const s=db.staff.find(x=>x.id===staffId);
+  const base=s.availability[dow(dateStr)];
+  if(base?.available) clearOverride(staffId,dateStr,weekMonday);
+  else {
+    const start=document.getElementById('editStart')?.value||'22:00';
+    const end=document.getElementById('editEnd')?.value||'30:00';
+    setOverride(staffId,dateStr,weekMonday,{start,end},'planned');
+  }
+  clearModal(); renderWeekly(); showToast('出勤に戻しました');
+}
+function resetToBase(staffId,dateStr){
+  clearOverride(staffId,dateStr,weekMonday);
+  clearModal(); renderWeekly(); showToast('基本シフトに戻しました');
+}
+
+// ════════════════════════════════════════════════════════
+//  EMERGENCY MODAL (確定後)
+// ════════════════════════════════════════════════════════
+function openEmergencyModal(staffId,dateStr){
+  const s=db.staff.find(x=>x.id===staffId);
+  const sh=getShift(s,dateStr,weekMonday);
+  const meta=getOverrideMeta(staffId,dateStr,weekMonday);
+  const ctype=meta?.changeType||'planned';
+  const isAbsent=ctype==='absent';
+
+  showModal(`
+    <div class="sheet-handle"></div>
+    <div class="sheet-body">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+        <div class="staff-avatar" style="background:${s.color};width:36px;height:36px;font-size:14px">${s.name[0]}</div>
+        <div><div style="font-weight:700;font-size:15px">${s.name}</div>
+          <div style="font-size:12px;color:#888">${fmtJP(dateStr)}（${DAYS[dow(dateStr)]}）予定: ${sh?dispTime(sh.start)+'〜'+dispTime(sh.end):'休み'}</div></div>
+        ${ctype!=='planned'?`<span class="badge badge-orange" style="margin-left:auto;font-size:10px">${ctypeLabel(ctype)}</span>`:''}
+      </div>
+      <div class="sep-line"></div>
+      <div class="sheet-title" style="margin-bottom:10px;font-size:14px">急遽対応</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <button class="btn btn-danger btn-full" onclick="setEmAbsent('${staffId}','${dateStr}')">急遽休み</button>
+        <button class="btn btn-full" style="background:#e67e22;color:#fff" onclick="showEmLate('${staffId}','${dateStr}','${sh?.start||'22:00'}','${sh?.end||'30:00'}')">遅刻（実際の開始時間を入力）</button>
+        <button class="btn btn-full" style="background:#8e44ad;color:#fff" onclick="showEmEarly('${staffId}','${dateStr}','${sh?.start||'22:00'}','${sh?.end||'30:00'}')">早退（実際の終了時間を入力）</button>
+        ${isAbsent||ctype!=='planned'?`<button class="btn btn-ghost btn-full btn-sm" onclick="restoreEmergency('${staffId}','${dateStr}')">予定通りに戻す</button>`:''}
+        <button class="btn btn-ghost btn-full btn-sm" onclick="clearModal()">キャンセル</button>
+      </div>
+    </div>`);
+}
+
+function ctypeLabel(t){
+  return {planned:'',absent:'急遽休み',late:'遅刻',earlyLeave:'早退',spot:'急遽出勤'}[t]||t;
+}
+
+function setEmAbsent(staffId,dateStr){
+  const s=db.staff.find(x=>x.id===staffId);
+  const sh=getShift(s,dateStr,weekMonday)||{start:'22:00',end:'30:00'};
+  setOverride(staffId,dateStr,weekMonday,null,'absent');
+  clearModal(); renderWeekly(); showToast('急遽休みを記録しました');
+}
+
+function showEmLate(staffId,dateStr,origStart,origEnd){
+  clearModal();
+  showModal(`
+    <div class="sheet-handle"></div>
+    <div class="sheet-body">
+      <div class="sheet-title">遅刻 — 実際の開始時間</div>
+      <div class="form-group"><label class="form-label">予定開始: ${origStart}</label>
+        <label class="form-label" style="margin-top:8px">実際の開始時間</label>
+        <select class="form-input" id="emStart">${selOpts(START_OPTS,origStart)}</select></div>
+      <div style="font-size:12px;color:#888;margin-bottom:14px">終了時間（${dispTime(origEnd)}）はそのまま計算されます</div>
+      <button class="btn btn-warn btn-full" onclick="saveEmLate('${staffId}','${dateStr}','${origEnd}')">保存</button>
+      <div style="height:8px"></div>
+      <button class="btn btn-ghost btn-full btn-sm" onclick="clearModal()">キャンセル</button>
+    </div>`);
+}
+
+function saveEmLate(staffId,dateStr,origEnd){
+  const actualStart=document.getElementById('emStart').value;
+  setOverride(staffId,dateStr,weekMonday,{start:actualStart,end:origEnd},'late');
+  clearModal(); renderWeekly(); showToast('遅刻を記録しました');
+}
+
+function showEmEarly(staffId,dateStr,origStart,origEnd){
+  clearModal();
+  showModal(`
+    <div class="sheet-handle"></div>
+    <div class="sheet-body">
+      <div class="sheet-title">早退 — 実際の終了時間</div>
+      <div style="font-size:12px;color:#888;margin-bottom:14px">開始時間（${origStart}）はそのまま計算されます</div>
+      <div class="form-group"><label class="form-label">予定終了: ${dispTime(origEnd)}</label>
+        <label class="form-label" style="margin-top:8px">実際の終了時間</label>
+        <select class="form-input" id="emEnd">${selOpts(END_OPTS,origEnd)}</select></div>
+      <button class="btn btn-full" style="background:#8e44ad;color:#fff" onclick="saveEmEarly('${staffId}','${dateStr}','${origStart}')">保存</button>
+      <div style="height:8px"></div>
+      <button class="btn btn-ghost btn-full btn-sm" onclick="clearModal()">キャンセル</button>
+    </div>`);
+}
+
+function saveEmEarly(staffId,dateStr,origStart){
+  const actualEnd=document.getElementById('emEnd').value;
+  setOverride(staffId,dateStr,weekMonday,{start:origStart,end:actualEnd},'earlyLeave');
+  clearModal(); renderWeekly(); showToast('早退を記録しました');
+}
+
+function restoreEmergency(staffId,dateStr){
+  clearOverride(staffId,dateStr,weekMonday);
+  clearModal(); renderWeekly(); showToast('予定通りに戻しました');
+}
+
+// ════════════════════════════════════════════════════════
+//  SPOT (急遽出勤)
+// ════════════════════════════════════════════════════════
+function showSpotModal(){
+  if(!db.staff.length){showToast('スタッフを登録してください');return;}
+  const mon=parseDate(weekMonday);
+  const dates=Array.from({length:7},(_,i)=>fmt(addDays(mon,i)));
+  const staffOpts=db.staff.map(s=>`<option value="${s.id}">${s.name}</option>`).join('');
+  const dateOpts=dates.map(d=>`<option value="${d}">${DAYS[dow(d)]} ${fmtJP(d)}</option>`).join('');
+
+  showModal(`
+    <div class="sheet-handle"></div>
+    <div class="sheet-body">
+      <div class="sheet-title">急遽出勤</div>
+      <div class="form-group"><label class="form-label">スタッフ</label>
+        <select class="form-input" id="spStaff">${staffOpts}</select></div>
+      <div class="form-group"><label class="form-label">日付</label>
+        <select class="form-input" id="spDate">${dateOpts}</select></div>
+      <div class="form-group"><label class="form-label">開始</label>
+        <select class="form-input" id="spStart">${selOpts(START_OPTS,'22:00')}</select></div>
+      <div class="form-group"><label class="form-label">終了</label>
+        <select class="form-input" id="spEnd">${selOpts(END_OPTS,'30:00')}</select></div>
+      <button class="btn btn-accent btn-full" onclick="saveSpot()">急遽出勤を追加</button>
+      <div style="height:8px"></div>
+      <button class="btn btn-ghost btn-full btn-sm" onclick="clearModal()">キャンセル</button>
+    </div>`);
+}
+
+function saveSpot(){
+  const staffId=document.getElementById('spStaff').value;
+  const dateStr=document.getElementById('spDate').value;
+  const start=document.getElementById('spStart').value;
+  const end=document.getElementById('spEnd').value;
+  setOverride(staffId,dateStr,weekMonday,{start,end},'spot');
+  clearModal(); renderWeekly(); showToast('急遽出勤を追加しました');
+}
+
+// ════════════════════════════════════════════════════════
+//  MONTHLY
+// ════════════════════════════════════════════════════════
+function renderMonthly(){
+  setHeader('月次集計',false);
+  document.getElementById('modalRoot').innerHTML='';
+  const{year,month}=curMonth;
+  const stats=monthlyStats(year,month).sort((a,b)=>b.hours-a.hours);
+  const maxH=Math.max(...stats.map(s=>s.hours),1);
+  const totH=stats.reduce((s,x)=>s+x.hours,0);
+  const totW=stats.reduce((s,x)=>s+x.wage,0);
+  const active=stats.filter(s=>s.days>0).length;
+
+  document.getElementById('appContent').innerHTML=`
+    <div class="month-nav">
+      <button class="nav-arrow" onclick="chMonth(-1)">&#8249;</button>
+      <span style="font-size:15px;font-weight:700">${year}年${month}月</span>
+      <button class="nav-arrow" onclick="chMonth(1)">&#8250;</button>
+    </div>
+    <div class="card" style="display:flex;justify-content:space-around;padding:14px 8px;text-align:center">
+      <div><div style="font-size:22px;font-weight:800;color:#1e2a3a">${totH.toFixed(1)}</div>
+        <div style="font-size:10px;color:#999;margin-top:2px">合計時間（h）</div></div>
+      <div style="width:1px;background:#eee"></div>
+      <div><div style="font-size:22px;font-weight:800;color:#e94560">¥${totW.toLocaleString()}</div>
+        <div style="font-size:10px;color:#999;margin-top:2px">合計人件費</div></div>
+      <div style="width:1px;background:#eee"></div>
+      <div><div style="font-size:22px;font-weight:800;color:#27ae60">${active}</div>
+        <div style="font-size:10px;color:#999;margin-top:2px">出勤スタッフ</div></div>
+    </div>
+    <div class="section-title">スタッフ別</div>
+    <div class="card" style="padding:0;overflow:hidden">
+      ${stats.map(x=>`
+        <div class="monthly-staff">
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <div style="display:flex;align-items:center;gap:10px">
+              <div class="staff-avatar" style="background:${x.staff.color};width:36px;height:36px;font-size:14px">${x.staff.name[0]}</div>
+              <div><div style="font-weight:600;font-size:14px">${x.staff.name}</div>
+                <div style="font-size:11px;color:#aaa">${x.days}日 / ¥${x.staff.hourlyWage.toLocaleString()}/h</div></div>
+            </div>
+            <div style="text-align:right">
+              <div style="font-weight:800;font-size:16px">${x.hours.toFixed(1)}h</div>
+              <div style="font-size:12px;color:#e94560;font-weight:600">¥${x.wage.toLocaleString()}</div>
+            </div>
+          </div>
+          <div class="hours-bar"><div class="hours-fill" style="width:${(x.hours/maxH*100).toFixed(1)}%;background:${x.staff.color}"></div></div>
+        </div>`).join('')}
+    </div>
+    <div style="height:30px"></div>`;
+}
+function chMonth(d){
+  curMonth.month+=d;
+  if(curMonth.month>12){curMonth.month=1;curMonth.year++;}
+  if(curMonth.month<1){curMonth.month=12;curMonth.year--;}
+  renderMonthly();
+}
+
+// ════════════════════════════════════════════════════════
+//  MODAL
+// ════════════════════════════════════════════════════════
+function showModal(html){
+  document.getElementById('modalRoot').innerHTML=
+    `<div class="overlay" onclick="overlayClose(event)">
+      <div class="sheet" onclick="event.stopPropagation()">${html}</div>
+    </div>`;
+}
+function overlayClose(e){ if(e.target.classList.contains('overlay')) clearModal(); }
+function clearModal(){
+  const mr=document.getElementById('modalRoot');
+  if(currentTab==='staff'&&!editingId) mr.innerHTML=`<button class="fab" onclick="openEdit(null)">＋</button>`;
+  else mr.innerHTML='';
+}
+
+// ════════════════════════════════════════════════════════
+//  TOAST
+// ════════════════════════════════════════════════════════
+function showToast(msg){
+  const el=document.createElement('div');
+  el.className='toast';el.textContent=msg;
+  document.body.appendChild(el);
+  setTimeout(()=>el.remove(),2200);
+}
+
+// ════════════════════════════════════════════════════════
+//  TIME PAD
+// ════════════════════════════════════════════════════════
+let tpad={entered:[],targetId:'',isEnd:false,label:''};
+
+function showTimePad(targetId,currentVal,isEnd,label){
+  const parts=String(currentVal).split(':');
+  const h=(parts[0]||'00').padStart(2,'0');
+  const m=(parts[1]||'00').padStart(2,'0');
+  tpad={entered:[h[0],h[1],m[0],m[1]],targetId,isEnd,label:label||''};
+  renderTPad();
+}
+
+function renderTPad(){
+  const e=tpad.entered;
+  const d=i=>e[i]||'_';
+  const dispStr=`${d(0)}${d(1)}:${d(2)}${d(3)}`;
+  let preview='';
+  if(e.length===4){
+    const h=parseInt(e[0]+e[1]),m=parseInt(e[2]+e[3]);
+    if(h<=(tpad.isEnd?32:23)&&m<=59&&!(h===32&&m>0)){
+      const t=`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+      preview=tpad.isEnd?dispTime(t):t;
+    } else { preview='⚠ 無効な時刻'; }
+  }
+  const keys=[1,2,3,4,5,6,7,8,9,'back',0,'ok'];
+  const kbtns=keys.map(k=>{
+    if(k==='back') return `<button class="tpad-key tpad-back" onclick="tpadKey('back')">⌫</button>`;
+    if(k==='ok')   return `<button class="tpad-key tpad-ok"  onclick="tpadConfirm()">✓</button>`;
+    return `<button class="tpad-key" onclick="tpadKey(${k})">${k}</button>`;
+  }).join('');
+  document.getElementById('tpadRoot').innerHTML=`
+    <div class="tpad-overlay" onclick="clearTPad()">
+      <div class="tpad-sheet" onclick="event.stopPropagation()">
+        ${tpad.label?`<div style="text-align:center;font-size:12px;color:#888;margin-bottom:8px">${tpad.label}</div>`:''}
+        <div class="tpad-display">
+          <div style="font-size:34px;letter-spacing:8px;font-family:monospace;color:#1e2a3a">${dispStr}</div>
+          <div style="font-size:13px;color:#888;min-height:18px;margin-top:4px">${preview}</div>
+        </div>
+        <div class="tpad-grid">${kbtns}</div>
+      </div>
+    </div>`;
+}
+
+function tpadKey(k){
+  if(k==='back'){ tpad.entered.pop(); }
+  else if(tpad.entered.length<4){ tpad.entered.push(String(k)); }
+  renderTPad();
+}
+
+function tpadConfirm(){
+  const e=tpad.entered;
+  if(e.length<4){showToast('4桁で入力してください');return;}
+  const h=parseInt(e[0]+e[1]),m=parseInt(e[2]+e[3]);
+  if(isNaN(h)||isNaN(m)||h>(tpad.isEnd?32:23)||m>59||(h===32&&m>0)){
+    showToast('無効な時刻です');return;
+  }
+  const timeStr=`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+  const inp=document.getElementById(tpad.targetId);
+  if(inp) inp.value=timeStr;
+  const btn=document.getElementById('b_'+tpad.targetId);
+  if(btn) btn.textContent=tpad.isEnd?dispTime(timeStr):timeStr;
+  clearTPad();
+}
+
+function clearTPad(){
+  document.getElementById('tpadRoot').innerHTML='';
+}
+
+// ════════════════════════════════════════════════════════
+//  INIT
+// ════════════════════════════════════════════════════════
+loadDB();
+render();
+
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('/sw.js').catch(()=>{});
+}
+</script>
+</body>
+</html>
