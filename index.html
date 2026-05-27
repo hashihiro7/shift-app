@@ -302,6 +302,7 @@ function monthlyStats(year,month){
     const end=new Date(year,month,0);
     for(let d=new Date(year,month-1,1);d<=end;d.setDate(d.getDate()+1)){
       const ds=fmt(d),wk=fmt(getMonday(d));
+      if(!isConfirmed(wk)) continue; // 確定済みの週だけ集計
       const sh=getShift(s,ds,wk);
       if(!sh) continue;
       const meta=getOverrideMeta(s.id,ds,wk);
